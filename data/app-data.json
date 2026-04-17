@@ -1,0 +1,54 @@
+{
+  "profiles": [
+    {
+      "id": 1,
+      "name": "Administrator",
+      "description": "Full access to user management",
+      "createdAt": "2026-04-17T00:00:00.000Z",
+      "updatedAt": "2026-04-17T00:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "name": "Manager",
+      "description": "Operational access to the backoffice",
+      "createdAt": "2026-04-17T00:00:00.000Z",
+      "updatedAt": "2026-04-17T00:00:00.000Z"
+    }
+  ],
+  "users": [
+    {
+      "id": 1,
+      "firstName": "Luiz Henrique",
+      "lastName": "Souza Silva",
+      "username": "admin",
+      "email": "henriquesouzasilva80@gmail.com",
+      "password": "$2b$10$aIX7Gc3acADXXozBD5aFqOK.mpCwddd4Qb5.XMhQYVUOcU6PbTYpu",
+      "phone": "(99) 99999-9999",
+      "language": "pt-BR",
+      "theme": null,
+      "avatar": null,
+      "avatarColor": "3B82F6",
+      "status": "ACTIVE",
+      "profileId": 1,
+      "createdAt": "2026-04-17T00:00:00.000Z",
+      "updatedAt": "2026-04-17T18:56:17.537Z"
+    },
+    {
+      "id": 2,
+      "firstName": "Project",
+      "lastName": "Manager",
+      "username": "manager",
+      "email": "manager@user-manager.local",
+      "password": "$2b$10$uR0IXf1QWKUPTYE8dUUeQeMq9MKGkvrKeUjGJPD7W82dManIeZDV6",
+      "phone": "11988888888",
+      "language": "pt-BR",
+      "theme": null,
+      "avatar": null,
+      "avatarColor": "22C55E",
+      "status": "ACTIVE",
+      "profileId": 2,
+      "createdAt": "2026-04-17T00:00:00.000Z",
+      "updatedAt": "2026-04-17T00:00:00.000Z"
+    }
+  ]
+}
