@@ -1,11 +1,10 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { useTheme } from "next-themes";
 import { clientAPI } from "@/service/client";
 import Button from "@/components/ui/button";
 import Input from "@/components/ui/input";
@@ -16,8 +15,7 @@ import {
   updateUserSchema,
   userSchema,
 } from "@/validators/user.schema";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import { useT } from "@/components/providers/language-context";
 
 type UserProfile = {
   id: number;
@@ -28,90 +26,19 @@ type UserProfile = {
   avatar?: string | null;
   avatarColor?: string | null;
   profile?: { id: number; name: string } | null;
+  createdAt?: string;
 };
 
-type Lang = "pt" | "en";
-
-// ─── i18n ─────────────────────────────────────────────────────────────────────
-
-const T = {
-  pt: {
-    loading: "Carregando perfil...",
-    loadError: "Não foi possível carregar o perfil.",
-    personal: "Informações pessoais",
-    firstName: "Nome",
-    lastName: "Sobrenome",
-    savedName: "Nome atualizado com sucesso.",
-    account: "Dados da conta",
-    email: "E-mail",
-    profileLabel: "Perfil",
-    phone: "Telefone",
-    savedAccount: "Dados da conta atualizados.",
-    customization: "Personalização",
-    colorLabel: "Cor de identificação",
-    colorDesc: "Essa cor aparece no cabeçalho e no avatar.",
-    savedColor: "Cor do perfil atualizada.",
-    colorUpdated: "Cor atualizada.",
-    security: "Segurança",
-    changePassword: "Alterar senha",
-    changePasswordDesc: "Clique para definir uma nova senha para a sua conta.",
-    password: "Senha",
-    confirmPassword: "Confirmar senha",
-    savedPassword: "Senha atualizada com sucesso.",
-    passwordMismatch: "As senhas não coincidem.",
-    confirmRequired: "Confirme a senha.",
-    save: "Salvar",
-    savePassword: "Salvar senha",
-    saving: "Salvando...",
-    cancel: "Cancelar",
-  },
-  en: {
-    loading: "Loading profile...",
-    loadError: "Could not load profile.",
-    personal: "Personal information",
-    firstName: "First name",
-    lastName: "Last name",
-    savedName: "Name updated successfully.",
-    account: "Account details",
-    email: "E-mail",
-    profileLabel: "Profile",
-    phone: "Phone",
-    savedAccount: "Account details updated.",
-    customization: "Customization",
-    colorLabel: "Identification color",
-    colorDesc: "This color appears in the header and avatar.",
-    savedColor: "Profile color updated.",
-    colorUpdated: "Color updated.",
-    security: "Security",
-    changePassword: "Change password",
-    changePasswordDesc: "Click to set a new password for your account.",
-    password: "Password",
-    confirmPassword: "Confirm password",
-    savedPassword: "Password updated successfully.",
-    passwordMismatch: "Passwords do not match.",
-    confirmRequired: "Please confirm your password.",
-    save: "Save",
-    savePassword: "Save password",
-    saving: "Saving...",
-    cancel: "Cancel",
-  },
-} satisfies Record<Lang, Record<string, string>>;
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const COLORS = [
-  "#3B82F6",
-  "#EF4444",
-  "#F59E0B",
-  "#22C55E",
-  "#8B5CF6",
-  "#EC4899",
-  "#06B6D4",
-  "#6366F1",
-];
-const DEFAULT_AVATAR_COLOR = "3B82F6";
-
-// ─── Schemas (defined outside component to avoid recreation) ──────────────────
+const MONOCHROME_STYLES = [
+  { value: "111111", labelKey: "profileStyleClassic" },
+  { value: "3F3F46", labelKey: "profileStyleSlate" },
+  { value: "737373", labelKey: "profileStyleSoft" },
+  { value: "E5E5E5", labelKey: "profileStyleContrast" },
+  { value: "DC2626", labelKey: "profileStyleRuby" },
+  { value: "2563EB", labelKey: "profileStyleOcean" },
+  { value: "84CC16", labelKey: "profileStyleLime" },
+] as const;
+const DEFAULT_AVATAR_COLOR = "111111";
 
 const personalInfoSchema = z.object({
   firstName: userSchema.shape.firstName,
@@ -125,7 +52,7 @@ const accountInfoSchema = z.object({
 
 const customizationSchema = updateUserSchema.pick({ avatarColor: true });
 
-function makeSecuritySchema(t: typeof T.pt) {
+function makeSecuritySchema(t: ReturnType<typeof useT>) {
   return z
     .object({
       password: createUserSchema.shape.password,
@@ -136,8 +63,6 @@ function makeSecuritySchema(t: typeof T.pt) {
       message: t.passwordMismatch,
     });
 }
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function normalizeAvatarColor(color?: string | null) {
   return (
@@ -150,40 +75,47 @@ function toColorHex(color?: string | null) {
   return `#${normalizeAvatarColor(color)}`;
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+function isLightColor(color?: string | null) {
+  const normalized = normalizeAvatarColor(color);
+  const rgb = Number.parseInt(normalized, 16);
+  const red = (rgb >> 16) & 255;
+  const green = (rgb >> 8) & 255;
+  const blue = rgb & 255;
+  const luminance = (red * 299 + green * 587 + blue * 114) / 1000;
+  return luminance > 160;
+}
 
 export default function ProfilePage() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [lang, setLang] = useState<Lang>("pt");
-  const { theme, setTheme } = useTheme();
-  const t = T[lang];
+  const t = useT();
 
   useEffect(() => {
     async function load() {
       try {
-        const response = await clientAPI.get("/users/me");
-        setUser(response.data.data);
+        const res = await clientAPI.get("/users/me");
+        setUser(res.data.data);
       } catch {
         toast.error(t.loadError);
       } finally {
         setLoading(false);
       }
     }
+
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function patchCurrentUser(payload: Record<string, unknown>) {
-    const response = await clientAPI.patch("/users/me", payload);
-    setUser(response.data.data);
-    return response.data.data as UserProfile;
+    const res = await clientAPI.patch("/users/me", payload);
+    setUser(res.data.data);
+    return res.data.data as UserProfile;
   }
 
   if (loading) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center text-black/60 dark:text-white/60">
-        {t.loading}
+      <div className="flex min-h-[50vh] items-center justify-center text-black/40 dark:text-white/40">
+        <span className="animate-pulse">{t.loading}</span>
       </div>
     );
   }
@@ -192,96 +124,118 @@ export default function ProfilePage() {
 
   const avatarColor = toColorHex(user.avatarColor);
   const initials =
-    `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase();
+    `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase() ||
+    "--";
+  const avatarIsLight = isLightColor(user.avatarColor);
+  const profileStats = [
+    { label: t.profileLabel, value: user.profile?.name ?? "-" },
+    { label: t.contactReady, value: user.email && user.phone ? "100%" : "50%" },
+    {
+      label: t.accountSince,
+      value: user.createdAt
+        ? new Date(user.createdAt).toLocaleDateString()
+        : "-",
+    },
+  ];
 
   return (
     <main className="space-y-6">
-      {/* ── Profile card ── */}
-      <div
-        className={`overflow-hidden rounded-2xl border shadow-sm transition-colors ${
-          theme === "dark"
-            ? "border-white/10 bg-black text-white"
-            : "border-black/10 bg-white text-black"
-        }`}
-      >
-        {/* Banner */}
+      <section className="overflow-hidden rounded-[32px] border border-black/10 bg-white shadow-[0_24px_70px_-55px_rgba(0,0,0,1)] dark:border-white/10 dark:bg-black">
+        <div
+          className="relative overflow-hidden border-b border-black/10 p-6 dark:border-white/10 sm:p-8"
+          style={{
+            backgroundImage:
+              "linear-gradient(135deg, rgba(255,255,255,0.18), transparent 48%), linear-gradient(160deg, rgba(0,0,0,0.1), transparent 72%)",
+            backgroundColor: avatarColor,
+          }}
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.14),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(0,0,0,0.18),transparent_36%)]" />
+          <div className="relative grid gap-6 lg:grid-cols-[1fr_320px]">
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-end">
+              <div
+                className="flex h-24 w-24 items-center justify-center rounded-full border-4 text-2xl font-semibold shadow-lg"
+                style={{
+                  backgroundColor: avatarColor,
+                  borderColor: avatarIsLight ? "#171717" : "#FAFAFA",
+                  color: avatarIsLight ? "#111111" : "#FAFAFA",
+                }}
+              >
+                {user.avatar ? (
+                  <Image
+                    src={user.avatar}
+                    alt="Avatar"
+                    width={96}
+                    height={96}
+                    className="rounded-full object-cover"
+                  />
+                ) : (
+                  initials
+                )}
+              </div>
 
-        <div className="relative h-36" style={{ backgroundColor: avatarColor }}>
-          <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent dark:from-white/10 dark:to-black/20" />
-          <div className="absolute right-4 bottom-4 flex gap-2">
-            {COLORS.map((color) => (
-              <button
-                key={color}
-                type="button"
-                title={color}
-                className="h-6 w-6 rounded-full border-2 border-white/70 shadow transition hover:scale-110"
-                style={{ backgroundColor: color }}
-                onClick={() =>
-                  void patchCurrentUser({
-                    avatarColor: normalizeAvatarColor(color),
-                  }).then(() => toast.success(t.colorUpdated))
-                }
-              />
-            ))}
+              <div className={avatarIsLight ? "text-black" : "text-white"}>
+                <p className="text-xs font-semibold uppercase tracking-[0.26em] opacity-60">
+                  {t.quickStats}
+                </p>
+                <h1 className="mt-3 text-3xl font-semibold sm:text-4xl">
+                  {user.firstName} {user.lastName}
+                </h1>
+                <p className="mt-3 max-w-2xl text-sm leading-6 opacity-75">
+                  {t.quickStatsDesc}
+                </p>
+                <p className="mt-3 text-sm opacity-80">
+                  {user.profile?.name ?? "-"} • {user.email ?? "-"}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3">
+              {profileStats.map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-[24px] border border-white/25 bg-white/12 p-4 text-white backdrop-blur-sm"
+                >
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/55">
+                    {item.label}
+                  </p>
+                  <p className="mt-3 text-xl font-semibold">{item.value}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Avatar + name header */}
-        <div className="relative px-6 pb-6">
-          <div className="flex items-end gap-4">
-            <div
-              className="-mt-10 flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-4 border-white text-2xl font-bold text-white shadow-md dark:border-white/10"
-              style={{ backgroundColor: avatarColor }}
-            >
-              {user.avatar ? (
-                <Image
-                  src={user.avatar}
-                  alt="Avatar"
-                  width={80}
-                  height={80}
-                  className="h-20 w-20 rounded-full object-cover"
-                />
-              ) : (
-                initials
-              )}
-            </div>
-            <div className="pb-1">
-              <p className="text-lg font-semibold text-black dark:text-white">
-                {user.firstName} {user.lastName}
-              </p>
-              <p className="text-sm text-black/60 dark:text-white/60">
-                {user.profile?.name ?? "—"} · {user.email ?? "—"}
-              </p>
-            </div>
+        <div className="grid gap-0 divide-y divide-black/8 dark:divide-white/8 xl:grid-cols-[1.1fr_0.9fr] xl:divide-x xl:divide-y-0">
+          <div>
+            <SectionWrapper>
+              <PersonalInfoSection user={user} onSave={patchCurrentUser} />
+            </SectionWrapper>
+            <SectionWrapper>
+              <AccountInfoSection user={user} onSave={patchCurrentUser} />
+            </SectionWrapper>
           </div>
-
-          {/* Divider */}
-          <div className="mt-6 border-t border-black/10 dark:border-white/10" />
-
-          {/* Sections */}
-          <div className="mt-6 grid gap-8">
-            <PersonalInfoSection user={user} onSave={patchCurrentUser} t={t} />
-            <AccountInfoSection user={user} onSave={patchCurrentUser} t={t} />
-            <CustomizationSection user={user} onSave={patchCurrentUser} t={t} />
-            <SecuritySection onSave={patchCurrentUser} t={t} />
+          <div>
+            <SectionWrapper>
+              <CustomizationSection user={user} onSave={patchCurrentUser} />
+            </SectionWrapper>
+            <SectionWrapper>
+              <SecuritySection onSave={patchCurrentUser} />
+            </SectionWrapper>
           </div>
         </div>
-      </div>
+      </section>
     </main>
   );
 }
 
-// ─── Section: Personal Info ───────────────────────────────────────────────────
-
 function PersonalInfoSection({
   user,
   onSave,
-  t,
 }: {
   user: UserProfile;
   onSave: (payload: Record<string, unknown>) => Promise<UserProfile>;
-  t: typeof T.pt;
 }) {
+  const t = useT();
   const form = useForm({
     resolver: zodResolver(personalInfoSchema),
     defaultValues: { firstName: user.firstName, lastName: user.lastName },
@@ -294,7 +248,7 @@ function PersonalInfoSection({
 
   return (
     <section>
-      <SectionHeading>{t.personal}</SectionHeading>
+      <SectionHeading title={t.personal} description={t.personalDesc} />
       <FormProvider {...form}>
         <form
           className="space-y-4"
@@ -303,17 +257,11 @@ function PersonalInfoSection({
             toast.success(t.savedName);
           })}
         >
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field
-              label={t.firstName}
-              error={formState.errors.firstName?.message}
-            >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={t.firstName} error={formState.errors.firstName?.message}>
               <Input {...register("firstName")} />
             </Field>
-            <Field
-              label={t.lastName}
-              error={formState.errors.lastName?.message}
-            >
+            <Field label={t.lastName} error={formState.errors.lastName?.message}>
               <Input {...register("lastName")} />
             </Field>
           </div>
@@ -323,7 +271,6 @@ function PersonalInfoSection({
             onCancel={() =>
               reset({ firstName: user.firstName, lastName: user.lastName })
             }
-            t={t}
           />
         </form>
       </FormProvider>
@@ -331,17 +278,14 @@ function PersonalInfoSection({
   );
 }
 
-// ─── Section: Account Info ────────────────────────────────────────────────────
-
 function AccountInfoSection({
   user,
   onSave,
-  t,
 }: {
   user: UserProfile;
   onSave: (payload: Record<string, unknown>) => Promise<UserProfile>;
-  t: typeof T.pt;
 }) {
+  const t = useT();
   const form = useForm({
     resolver: zodResolver(accountInfoSchema),
     defaultValues: { email: user.email ?? "", phone: user.phone ?? "" },
@@ -354,22 +298,19 @@ function AccountInfoSection({
 
   return (
     <section>
-      <SectionHeading>{t.account}</SectionHeading>
+      <SectionHeading title={t.account} description={t.accountDesc} />
       <form
         className="space-y-4"
         onSubmit={handleSubmit(async (data) => {
-          await onSave({
-            ...data,
-            phone: data.phone?.trim() ? data.phone : null,
-          });
+          await onSave({ ...data, phone: data.phone?.trim() || null });
           toast.success(t.savedAccount);
         })}
       >
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           <Field
             label={t.email}
             error={formState.errors.email?.message}
-            className="md:col-span-2"
+            className="sm:col-span-2"
           >
             <Input {...register("email")} />
           </Field>
@@ -377,14 +318,14 @@ function AccountInfoSection({
             <Input
               value={user.profile?.name ?? "-"}
               readOnly
-              className="cursor-default opacity-70"
+              className="cursor-default opacity-65"
             />
           </Field>
           <Field label={t.phone} error={formState.errors.phone?.message}>
             <Input
               value={watch("phone") ?? ""}
-              onChange={(e) =>
-                setValue("phone", toPhone(e.target.value), {
+              onChange={(event) =>
+                setValue("phone", toPhone(event.target.value), {
                   shouldDirty: true,
                 })
               }
@@ -394,33 +335,33 @@ function AccountInfoSection({
         <SectionActions
           dirty={formState.isDirty}
           saving={formState.isSubmitting}
-          onCancel={() =>
-            reset({ email: user.email ?? "", phone: user.phone ?? "" })
-          }
-          t={t}
+          onCancel={() => reset({ email: user.email ?? "", phone: user.phone ?? "" })}
         />
       </form>
     </section>
   );
 }
 
-// ─── Section: Customization ───────────────────────────────────────────────────
-
 function CustomizationSection({
   user,
   onSave,
-  t,
 }: {
   user: UserProfile;
   onSave: (payload: Record<string, unknown>) => Promise<UserProfile>;
-  t: typeof T.pt;
 }) {
+  const t = useT();
   const form = useForm({
     resolver: zodResolver(customizationSchema),
     defaultValues: { avatarColor: normalizeAvatarColor(user.avatarColor) },
   });
   const { handleSubmit, reset, setValue, watch, formState } = form;
   const color = watch("avatarColor");
+  const previewIsLight = isLightColor(color);
+  const selectedStyle = useMemo(
+    () =>
+      MONOCHROME_STYLES.find((item) => item.value === normalizeAvatarColor(color)),
+    [color],
+  );
 
   useEffect(() => {
     reset({ avatarColor: normalizeAvatarColor(user.avatarColor) });
@@ -428,7 +369,7 @@ function CustomizationSection({
 
   return (
     <section>
-      <SectionHeading>{t.customization}</SectionHeading>
+      <SectionHeading title={t.customization} description={t.customizationDesc} />
       <form
         className="space-y-4"
         onSubmit={handleSubmit(async (data) => {
@@ -436,67 +377,83 @@ function CustomizationSection({
           toast.success(t.savedColor);
         })}
       >
-        <div className="rounded-xl border border-black/10 bg-white p-4 dark:border-white/10 dark:bg-black">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-black dark:text-white">
-                {t.colorLabel}
-              </p>
-              <p className="text-xs text-black/60 dark:text-white/60">
-                {t.colorDesc}
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <div
-                className="h-9 w-9 rounded-full border-2 border-white shadow-md dark:"
-                style={{ backgroundColor: toColorHex(color) }}
-              />
-              <div className="grid grid-cols-4 gap-2">
-                {COLORS.map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    title={item}
-                    className="h-6 w-6 rounded-full border-2 border-transparent transition hover:scale-110 hover:border-white"
-                    style={{ backgroundColor: item }}
-                    onClick={() =>
-                      setValue("avatarColor", normalizeAvatarColor(item), {
-                        shouldDirty: true,
-                      })
-                    }
-                  />
-                ))}
+        <div className="rounded-[28px] border border-black/10 bg-black/[0.03] p-5 dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="flex flex-col gap-5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-black dark:text-white">{t.colorLabel}</p>
+                <p className="mt-1 text-xs leading-5 text-black/50 dark:text-white/50">
+                  {t.colorDesc}
+                </p>
               </div>
+              <div
+                className="flex h-12 w-12 items-center justify-center rounded-full border text-sm font-semibold shadow-sm"
+                style={{
+                  backgroundColor: toColorHex(color),
+                  color: previewIsLight ? "#111111" : "#FAFAFA",
+                  borderColor: previewIsLight ? "#171717" : "#FAFAFA",
+                }}
+              >
+                {selectedStyle ? t[selectedStyle.labelKey] : "AA"}
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {MONOCHROME_STYLES.map((item) => {
+                const active = normalizeAvatarColor(color) === item.value;
+                const light = isLightColor(item.value);
+
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() =>
+                      setValue("avatarColor", item.value, { shouldDirty: true })
+                    }
+                    className={`rounded-[24px] border p-4 text-left transition ${
+                      active
+                        ? "border-black bg-black text-white dark:border-white dark:bg-white dark:text-black"
+                        : "border-black/10 bg-white text-black hover:border-black dark:border-white/10 dark:bg-black dark:text-white dark:hover:border-white"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="h-9 w-9 rounded-full border"
+                        style={{
+                          backgroundColor: toColorHex(item.value),
+                          borderColor: light ? "#171717" : "#FAFAFA",
+                        }}
+                      />
+                      <div>
+                        <p className="font-medium">{t[item.labelKey]}</p>
+                        <p className="text-xs text-current/60">#{item.value}</p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
         <SectionActions
           dirty={formState.isDirty}
           saving={formState.isSubmitting}
-          onCancel={() =>
-            reset({ avatarColor: normalizeAvatarColor(user.avatarColor) })
-          }
-          t={t}
+          onCancel={() => reset({ avatarColor: normalizeAvatarColor(user.avatarColor) })}
         />
       </form>
     </section>
   );
 }
 
-// ─── Section: Security ────────────────────────────────────────────────────────
-
 function SecuritySection({
   onSave,
-  t,
 }: {
   onSave: (payload: Record<string, unknown>) => Promise<UserProfile>;
-  t: typeof T.pt;
 }) {
+  const t = useT();
   const [editing, setEditing] = useState(false);
-  const securitySchema = makeSecuritySchema(t);
-
   const form = useForm({
-    resolver: zodResolver(securitySchema),
+    resolver: zodResolver(makeSecuritySchema(t)),
     defaultValues: { password: "", confirmPassword: "" },
   });
   const { register, handleSubmit, reset, formState } = form;
@@ -504,18 +461,23 @@ function SecuritySection({
   if (!editing) {
     return (
       <section>
-        <SectionHeading>{t.security}</SectionHeading>
+        <SectionHeading title={t.security} description={t.securityDesc} />
         <button
           type="button"
-          className="w-full rounded-xl border  bg-white dark:bg-slate-900 border border-black/10 dark:border-white/10 p-4 text-left transition hover:bg-black/5 dark:hover:bg-white/10 "
+          className="group w-full rounded-[28px] border border-black/10 bg-black/[0.03] p-5 text-left transition hover:bg-black hover:text-white dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white dark:hover:text-black"
           onClick={() => setEditing(true)}
         >
-          <p className="text-sm font-medium text-black dark:text-white">
-            {t.changePassword}
-          </p>
-          <p className="mt-1 text-xs text-black/60 dark:text-white/60">
-            {t.changePasswordDesc}
-          </p>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">{t.changePassword}</p>
+              <p className="mt-1 text-xs leading-5 text-current/60">
+                {t.changePasswordDesc}
+              </p>
+            </div>
+            <span className="text-xl text-current/50 transition group-hover:translate-x-1">
+              →
+            </span>
+          </div>
         </button>
       </section>
     );
@@ -523,9 +485,9 @@ function SecuritySection({
 
   return (
     <section>
-      <SectionHeading>{t.security}</SectionHeading>
+      <SectionHeading title={t.security} description={t.securityDesc} />
       <form
-        className="space-y-4 rounded-xl border border-black/10 bg-white p-4 dark:border-white/10 dark:bg-black"
+        className="space-y-4 rounded-[28px] border border-black/10 bg-black/[0.03] p-5 dark:border-white/10 dark:bg-white/[0.04]"
         onSubmit={handleSubmit(async (data) => {
           await onSave({ password: data.password });
           toast.success(t.savedPassword);
@@ -533,7 +495,7 @@ function SecuritySection({
           setEditing(false);
         })}
       >
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t.password} error={formState.errors.password?.message}>
             <Input type="password" {...register("password")} />
           </Field>
@@ -552,20 +514,32 @@ function SecuritySection({
             setEditing(false);
           }}
           submitLabel={t.savePassword}
-          t={t}
         />
       </form>
     </section>
   );
 }
 
-// ─── Shared UI primitives ─────────────────────────────────────────────────────
+function SectionWrapper({ children }: { children: React.ReactNode }) {
+  return <div className="px-6 py-6 sm:px-8">{children}</div>;
+}
 
-function SectionHeading({ children }: { children: React.ReactNode }) {
+function SectionHeading({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
   return (
-    <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-black/40 dark:text-white/40">
-      {children}
-    </h2>
+    <div className="mb-5">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.26em] text-black/35 dark:text-white/35">
+        {title}
+      </h2>
+      <p className="mt-2 text-sm leading-6 text-black/55 dark:text-white/55">
+        {description}
+      </p>
+    </div>
   );
 }
 
@@ -582,11 +556,11 @@ function Field({
 }) {
   return (
     <div className={className}>
-      <label className="mb-1.5 block text-xs font-medium text-black/70 dark:text-white/70">
+      <label className="mb-2 block text-xs font-medium uppercase tracking-[0.18em] text-black/55 dark:text-white/55">
         {label}
       </label>
       {children}
-      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+      {error ? <p className="mt-2 text-xs text-red-500">{error}</p> : null}
     </div>
   );
 }
@@ -596,26 +570,21 @@ function SectionActions({
   saving,
   onCancel,
   submitLabel,
-  t,
 }: {
   dirty: boolean;
   saving: boolean;
   onCancel: () => void;
   submitLabel?: string;
-  t: typeof T.pt;
 }) {
+  const t = useT();
+
   return (
     <div className="flex justify-end gap-2 pt-1">
-      <Button
-        type="button"
-        intent="ghost"
-        disabled={!dirty || saving}
-        onClick={onCancel}
-      >
+      <Button type="button" intent="ghost" disabled={!dirty || saving} onClick={onCancel}>
         {t.cancel}
       </Button>
       <Button type="submit" intent="primary" disabled={!dirty || saving}>
-        {saving ? t.saving : (submitLabel ?? t.save)}
+        {saving ? t.saving : submitLabel ?? t.save}
       </Button>
     </div>
   );
