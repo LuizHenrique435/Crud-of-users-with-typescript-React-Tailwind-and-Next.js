@@ -153,6 +153,7 @@ export const T = {
     profileStyleRed: "Ferrari",
     profileStyleOcean: "Oceano",
     profileStyleLime: "Lima",
+    profileStyleGreen: "Verde",
     fieldRequired: "Campo obrigatório",
   },
   en: {
@@ -288,6 +289,7 @@ export const T = {
     profileStyleRed: "Ferrari",
     profileStyleOcean: "Ocean",
     profileStyleLime: "Lime",
+    profileStyleGreen: "Green",
     fieldRequired: "Required field",
   },
 } as const satisfies Record<Lang, Record<string, string>>;

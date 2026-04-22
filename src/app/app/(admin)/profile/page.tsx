@@ -37,6 +37,7 @@ const MONOCHROME_STYLES = [
   { value: "EF0D19", labelKey: "profileStyleRed" },
   { value: "2563EB", labelKey: "profileStyleOcean" },
   { value: "84CC16", labelKey: "profileStyleLime" },
+  { value: "015E3A", labelKey: "profileStyleGreen" },
 ] as const;
 const DEFAULT_AVATAR_COLOR = "111111";
 
