@@ -14,7 +14,7 @@ export default function RootLayout({
         <ThemeProvider>
           <LanguageProvider>
             {children}
-            <Toaster richColors position="top-right" />
+            <Toaster richColors position="top-right" theme="system" />
           </LanguageProvider>
         </ThemeProvider>
       </body>

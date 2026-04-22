@@ -1,7 +1,6 @@
-﻿import { redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/layout/app-header";
 import { getSession } from "@/lib/auth/session";
-import { LanguageProvider } from "@/components/providers/language-context";
 
 export default async function AppLayout({
   children,
@@ -12,11 +11,9 @@ export default async function AppLayout({
   if (!session) redirect("/auth/sign-in");
 
   return (
-    <LanguageProvider>
-      <div className="min-h-screen bg-transparent">
-        <AppHeader />
-        <div className="mx-auto max-w-6xl px-4 py-10">{children}</div>
-      </div>
-    </LanguageProvider>
+    <div className="min-h-screen bg-white text-black dark:bg-black dark:text-white">
+      <AppHeader />
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">{children}</div>
+    </div>
   );
 }
