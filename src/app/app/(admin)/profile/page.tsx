@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
@@ -34,7 +34,7 @@ const MONOCHROME_STYLES = [
   { value: "3F3F46", labelKey: "profileStyleSlate" },
   { value: "737373", labelKey: "profileStyleSoft" },
   { value: "E5E5E5", labelKey: "profileStyleContrast" },
-  { value: "DC2626", labelKey: "profileStyleRuby" },
+  { value: "EF0D19", labelKey: "profileStyleRed" },
   { value: "2563EB", labelKey: "profileStyleOcean" },
   { value: "84CC16", labelKey: "profileStyleLime" },
 ] as const;
@@ -258,10 +258,16 @@ function PersonalInfoSection({
           })}
         >
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={t.firstName} error={formState.errors.firstName?.message}>
+            <Field
+              label={t.firstName}
+              error={formState.errors.firstName?.message}
+            >
               <Input {...register("firstName")} />
             </Field>
-            <Field label={t.lastName} error={formState.errors.lastName?.message}>
+            <Field
+              label={t.lastName}
+              error={formState.errors.lastName?.message}
+            >
               <Input {...register("lastName")} />
             </Field>
           </div>
@@ -335,7 +341,9 @@ function AccountInfoSection({
         <SectionActions
           dirty={formState.isDirty}
           saving={formState.isSubmitting}
-          onCancel={() => reset({ email: user.email ?? "", phone: user.phone ?? "" })}
+          onCancel={() =>
+            reset({ email: user.email ?? "", phone: user.phone ?? "" })
+          }
         />
       </form>
     </section>
@@ -359,7 +367,9 @@ function CustomizationSection({
   const previewIsLight = isLightColor(color);
   const selectedStyle = useMemo(
     () =>
-      MONOCHROME_STYLES.find((item) => item.value === normalizeAvatarColor(color)),
+      MONOCHROME_STYLES.find(
+        (item) => item.value === normalizeAvatarColor(color),
+      ),
     [color],
   );
 
@@ -369,7 +379,10 @@ function CustomizationSection({
 
   return (
     <section>
-      <SectionHeading title={t.customization} description={t.customizationDesc} />
+      <SectionHeading
+        title={t.customization}
+        description={t.customizationDesc}
+      />
       <form
         className="space-y-4"
         onSubmit={handleSubmit(async (data) => {
@@ -381,7 +394,9 @@ function CustomizationSection({
           <div className="flex flex-col gap-5">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-medium text-black dark:text-white">{t.colorLabel}</p>
+                <p className="text-sm font-medium text-black dark:text-white">
+                  {t.colorLabel}
+                </p>
                 <p className="mt-1 text-xs leading-5 text-black/50 dark:text-white/50">
                   {t.colorDesc}
                 </p>
@@ -438,7 +453,9 @@ function CustomizationSection({
         <SectionActions
           dirty={formState.isDirty}
           saving={formState.isSubmitting}
-          onCancel={() => reset({ avatarColor: normalizeAvatarColor(user.avatarColor) })}
+          onCancel={() =>
+            reset({ avatarColor: normalizeAvatarColor(user.avatarColor) })
+          }
         />
       </form>
     </section>
@@ -580,11 +597,16 @@ function SectionActions({
 
   return (
     <div className="flex justify-end gap-2 pt-1">
-      <Button type="button" intent="ghost" disabled={!dirty || saving} onClick={onCancel}>
+      <Button
+        type="button"
+        intent="ghost"
+        disabled={!dirty || saving}
+        onClick={onCancel}
+      >
         {t.cancel}
       </Button>
       <Button type="submit" intent="primary" disabled={!dirty || saving}>
-        {saving ? t.saving : submitLabel ?? t.save}
+        {saving ? t.saving : (submitLabel ?? t.save)}
       </Button>
     </div>
   );
