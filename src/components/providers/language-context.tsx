@@ -150,9 +150,10 @@ export const T = {
     profileStyleSoft: "Suave",
     profileStyleContrast: "Contraste",
     profileStyleSlate: "Grafite",
-    profileStyleRuby: "Rubi",
+    profileStyleRed: "Ferrari",
     profileStyleOcean: "Oceano",
     profileStyleLime: "Lima",
+    profileStyleGreen: "Verde",
     fieldRequired: "Campo obrigatório",
   },
   en: {
@@ -285,9 +286,10 @@ export const T = {
     profileStyleSoft: "Soft",
     profileStyleContrast: "Contrast",
     profileStyleSlate: "Slate",
-    profileStyleRuby: "Ruby",
+    profileStyleRed: "Ferrari",
     profileStyleOcean: "Ocean",
     profileStyleLime: "Lime",
+    profileStyleGreen: "Green",
     fieldRequired: "Required field",
   },
 } as const satisfies Record<Lang, Record<string, string>>;
